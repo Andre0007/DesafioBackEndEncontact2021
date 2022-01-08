@@ -2,7 +2,6 @@
 using Dapper.Contrib.Extensions;
 using Microsoft.Data.Sqlite;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using TesteBackendEnContact.Core.Domain.ContactBook;
 using TesteBackendEnContact.Core.Interface.ContactBook;
@@ -20,31 +19,43 @@ namespace TesteBackendEnContact.Repository
             this.databaseConfig = databaseConfig;
         }
 
-
+        /// <summary>
+        /// Inserindo ou atualiza um registro na base de dados sem precisar de uma instrução sql, apenas similar ao code first do dapper e a classe mapeada
+        /// </summary>
+        /// <param name="contactBook"></param>
+        /// <returns></returns>
         public async Task<IContactBook> SaveAsync(IContactBook contactBook)
         {
             using var connection = new SqliteConnection(databaseConfig.ConnectionString);
             var dao = new ContactBookDao(contactBook);
 
-            dao.Id = await connection.InsertAsync(dao);
+            if (dao.Id == 0)
+                dao.Id = await connection.InsertAsync(dao);
+            else
+                await connection.UpdateAsync(dao);
 
             return dao.Export();
         }
 
-
-        public async Task DeleteAsync(int id)
+        /// <summary>
+        /// Deletando um registro, com uma instrução sql para registrar e passar os parametros, Dapper
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        public async Task<int> DeleteAsync(int id)
         {
             using var connection = new SqliteConnection(databaseConfig.ConnectionString);
 
-            // TODO
-            var sql = "";
+            //Quando fica escrito TODO é um ponto incompleto do código que precisa ser trabalhado.
+            var sql = "DELETE FROM ContactBook WHERE Id = :id";
 
-            await connection.ExecuteAsync(sql);
+            return await connection.ExecuteAsync(sql, new { id });
         }
 
-
-
-
+        /// <summary>
+        /// Retorna toda lista de contatos registrados, QueryAsync Dapper
+        /// </summary>
+        /// <returns></returns>
         public async Task<IEnumerable<IContactBook>> GetAllAsync()
         {
             using var connection = new SqliteConnection(databaseConfig.ConnectionString);
@@ -53,20 +64,31 @@ namespace TesteBackendEnContact.Repository
             var result = await connection.QueryAsync<ContactBookDao>(query);
 
             var returnList = new List<IContactBook>();
+            returnList.AddRange(result);
 
-            foreach (var AgendaSalva in result.ToList())
-            {
-                IContactBook Agenda = new ContactBook(AgendaSalva.Id, AgendaSalva.Name.ToString());
-                returnList.Add(Agenda);
-            }
+            //Não precisa desse trecho, só faz a API pensar mais e demorar para retornar.
+            //foreach (var AgendaSalva in result.ToList())
+            //{
+            //    IContactBook Agenda = new ContactBook(AgendaSalva.Id, AgendaSalva.Name.ToString());
+            //    returnList.Add(Agenda);
+            //}
 
-            return returnList.ToList();
+            return returnList;
         }
+
+        /// <summary>
+        /// Volta apenas um resultado especifico, tuning evitando trazer uma lista na memória e dali filtrar com FirstOrDefault, QuerySingleAsync Dapper
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
         public async Task<IContactBook> GetAsync(int id)
         {
-            var list = await GetAllAsync();
+            using var connection = new SqliteConnection(databaseConfig.ConnectionString);
 
-            return list.ToList().Where(item => item.Id == id).FirstOrDefault();
+            var query = "SELECT * FROM ContactBook WHERE Id = :id";
+            var response = await connection.QueryFirstOrDefaultAsync<ContactBookDao>(query, new { id });
+
+            return response;
         }
     }
 
@@ -84,7 +106,7 @@ namespace TesteBackendEnContact.Repository
         public ContactBookDao(IContactBook contactBook)
         {
             Id = contactBook.Id;
-            Name = Name;
+            Name = contactBook.Name;
         }
 
         public IContactBook Export() => new ContactBook(Id, Name);

@@ -21,6 +21,11 @@ namespace TesteBackendEnContact.Repository
             this.databaseConfig = databaseConfig;
         }
 
+        /// <summary>
+        /// Insere ou atualiza um novo registro da empresa
+        /// </summary>
+        /// <param name="company"></param>
+        /// <returns></returns>
         public async Task<ICompany> SaveAsync(ICompany company)
         {
             using var connection = new SqliteConnection(databaseConfig.ConnectionString);
@@ -34,7 +39,7 @@ namespace TesteBackendEnContact.Repository
             return dao.Export();
         }
 
-        public async Task DeleteAsync(int id)
+        public async Task<int> DeleteAsync(int id)
         {
             using var connection = new SqliteConnection(databaseConfig.ConnectionString);
             using var transaction = connection.BeginTransaction();
@@ -43,7 +48,7 @@ namespace TesteBackendEnContact.Repository
             sql.AppendLine("DELETE FROM Company WHERE Id = @id;");
             sql.AppendLine("UPDATE Contact SET CompanyId = null WHERE CompanyId = @id;");
 
-            await connection.ExecuteAsync(sql.ToString(), new { id }, transaction);
+            return await connection.ExecuteAsync(sql.ToString(), new { id }, transaction);
         }
 
         public async Task<IEnumerable<ICompany>> GetAllAsync()
@@ -60,7 +65,7 @@ namespace TesteBackendEnContact.Repository
         {
             using var connection = new SqliteConnection(databaseConfig.ConnectionString);
 
-            var query = "SELECT * FROM Conpany where Id = @id";
+            var query = "SELECT * FROM Company where Id = @id";
             var result = await connection.QuerySingleOrDefaultAsync<CompanyDao>(query, new { id });
 
             return result?.Export();
